@@ -48,6 +48,8 @@ func newToken(tokenType token.TokenType, ch byte) token.Token {
 func (l *Lexer) NextToken() token.Token {
 	var tok token.Token
 
+	// Skip all white space until next
+	// valid readable character is found
 	l.skipWhiteSpace()
 
 	switch l.ch {
@@ -95,15 +97,17 @@ func (l *Lexer) NextToken() token.Token {
 		tok.Literal = ""
 		tok.Type = token.EOF
 	default:
-		if isLetter(l.ch) {
+		if isLetter(l.ch) { // Found a letter, we scan the identifier
 			tok.Literal = l.readIdentifier()          // Read the identifier
 			tok.Type = token.LookupIdent(tok.Literal) // Look up the identifier to get the appropriate token
 			return tok
-		} else if isDigit(l.ch) {
+
+		} else if isDigit(l.ch) { // Found a digit, we scan the number
 			tok.Literal = l.readNumber()
 			tok.Type = token.INT
 			return tok
-		} else {
+
+		} else { // What even is this
 			tok = newToken(token.ILLEGAL, l.ch)
 		}
 	}
