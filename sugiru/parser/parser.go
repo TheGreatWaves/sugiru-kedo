@@ -31,6 +31,9 @@ func (p *Parser) init() {
 	p.registerPrefix(token.INT, p.parseIntegerLiteral)
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
+	p.registerPrefix(token.TRUE, p.parseBoolean)
+	p.registerPrefix(token.FALSE, p.parseBoolean)
+	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
 
 	p.infixParseFns = make(map[token.TokenType]infixParserFn)
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
@@ -225,7 +228,7 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	// Acquire the appropriate prefix function
 	prefix := p.prefixParserFns[p.curToken.Type]
 
-	// If none exist, we return
+	// If none exist, we return error
 	if prefix == nil {
 		p.noPrefixParseFnError(p.curToken.Type)
 		return nil
@@ -234,12 +237,16 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	// Otherwise we call it
 	leftExp := prefix()
 
+	// If end of statement isn't reached and the current
+	// precedence is lower than the next, we evaluate the infix
 	for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
 		infix := p.infixParseFns[p.peekToken.Type]
 		if infix == nil {
 			return leftExp
 		}
 		p.nextToken()
+
+		// Effectively groups in the form: a -> (a op b)
 		leftExp = infix(leftExp)
 	}
 	return leftExp
@@ -258,7 +265,7 @@ func (p *Parser) parseIdentifier() ast.Expression {
 }
 
 func (p *Parser) parseIntegerLiteral() ast.Expression {
-	lit := &ast.IntegerLiteral{Token: p.curToken}
+	il := &ast.IntegerLiteral{Token: p.curToken}
 	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
 
 	// Error converting
@@ -268,9 +275,9 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 		return nil
 	}
 
-	lit.Value = value
+	il.Value = value
 
-	return lit
+	return il
 }
 
 func (p *Parser) parsePrefixExpression() ast.Expression {
@@ -313,4 +320,22 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	expression.Right = p.parseExpression(precedence)
 
 	return expression
+}
+
+func (p *Parser) parseBoolean() ast.Expression {
+	return &ast.Boolean{Token: p.curToken, Value: p.curTokenIs(token.TRUE)}
+}
+
+func (p *Parser) parseGroupedExpression() ast.Expression {
+	// Consume the LPAREN and move onto the expression
+	p.nextToken()
+
+	exp := p.parseExpression(LOWEST)
+
+	// Consume the RPAREN
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	return exp
 }
