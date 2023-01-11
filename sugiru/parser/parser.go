@@ -34,6 +34,8 @@ func (p *Parser) init() {
 	p.registerPrefix(token.TRUE, p.parseBoolean)
 	p.registerPrefix(token.FALSE, p.parseBoolean)
 	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
+	p.registerPrefix(token.IF, p.parseIfExpression)
+	p.registerPrefix(token.FUNCTION, p.parseFunctionExpression)
 
 	p.infixParseFns = make(map[token.TokenType]infixParserFn)
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
@@ -338,4 +340,135 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 	}
 
 	return exp
+}
+
+func (p *Parser) parseIfExpression() ast.Expression {
+	expression := &ast.IfExpression{Token: p.curToken}
+
+	// We expect to see left paren before condition,
+	// if successful, we consume the left paren
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+
+	// Move onto the condition and parse it
+	p.nextToken()
+	expression.Condition = p.parseExpression(LOWEST)
+
+	// We expect right paren to enclose the condition
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	// We expect left brace to begin block stmt
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	// Parse the true branch
+	expression.Then = p.parseBlockStatement()
+
+	// curToken is now }
+
+	// <Optional> Check if there is an else branch ( peek token )
+	if p.peekTokenIs(token.ELSE) {
+		// Move to the Else token
+		p.nextToken()
+
+		// We expect else body to start with {
+		if !p.expectPeek(token.LBRACE) {
+			return nil
+		}
+
+		// Parse the block statement
+		expression.Else = p.parseBlockStatement()
+	}
+
+	// Note: When we are on the last closing
+	// brace `}` at the time of our return
+	return expression
+}
+
+func (p *Parser) parseBlockStatement() *ast.BlockStatement {
+	block := &ast.BlockStatement{Token: p.curToken}
+	block.Statements = []ast.Statement{}
+
+	p.nextToken()
+
+	// While we haven't reached the end of the block, and we're not at the EOF
+	for !p.curTokenIs(token.RBRACE) && !p.curTokenIs(token.EOF) {
+		stmt := p.parseStatement()
+
+		// Nest the statement to the block
+		if stmt != nil {
+			block.Statements = append(block.Statements, stmt)
+		}
+
+		// Since after we parse each statement,
+		// we'll be at the `;` we have to consume
+		// it and move onto the next token
+		p.nextToken()
+	}
+	return block
+}
+
+func (p *Parser) parseFunctionExpression() ast.Expression {
+	expression := &ast.FunctionLiteral{Token: p.curToken}
+
+	// Move to the expected `(`
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+
+	// Start parsing parameters ( curToken is `(` )
+	expression.Parameters = p.parseFunctionParameters()
+	// End, curToken at `)`
+
+	// We expect the body to begin
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	// curToken is '{'
+	
+	// Parse body
+	expression.Body = p.parseBlockStatement()
+
+	return expression
+}
+
+func (p *Parser) parseFunctionParameters() []*ast.Identifier {
+	var identifiers []*ast.Identifier
+
+	// Note curToken is at `(`
+
+	// In the case of void param, next token is `)`
+	if p.peekTokenIs(token.RPAREN) {
+		p.nextToken()
+		return identifiers
+	}
+
+	// Move to the first param token
+	p.nextToken()
+
+	// Manually parse the first identifier
+	ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	identifiers = append(identifiers, ident)
+
+	// While there is a comma, we parse the next ident
+	for p.peekTokenIs(token.COMMA) {
+		p.nextToken() // Comma
+		p.nextToken() // Next identifier
+		ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		identifiers = append(identifiers, ident)
+	}
+
+	// Get the enclosing right paren,
+	// move onto it if it exists
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	// By the time we reach here, cur token is `)`
+	return identifiers
 }

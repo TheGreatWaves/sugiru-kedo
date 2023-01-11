@@ -2,8 +2,12 @@ package ast
 
 import (
 	"bytes"
+	"strings"
 	"sugiru/token"
 )
+
+// Note: The Token in each struct indicates where the current
+// token should be pointing to during its parse function
 
 // Node the interface which all AST nodes will implement
 type Node interface {
@@ -175,7 +179,9 @@ func (oe *InfixExpression) String() string {
 
 	out.WriteString("(")
 	out.WriteString(oe.Left.String())
-	out.WriteString(" " + oe.Operator + " ")
+	out.WriteString(" ")
+	out.WriteString(oe.Operator)
+	out.WriteString(" ")
 	out.WriteString(oe.Right.String())
 	out.WriteString(")")
 
@@ -191,3 +197,71 @@ type Boolean struct {
 func (b *Boolean) expressionNode()      {}
 func (b *Boolean) TokenLiteral() string { return b.Token.Literal }
 func (b *Boolean) String() string       { return b.Token.Literal }
+
+type IfExpression struct {
+	Token     token.Token // The if token
+	Condition Expression
+	Then      *BlockStatement
+	Else      *BlockStatement
+}
+
+func (ie *IfExpression) expressionNode()      {}
+func (ie *IfExpression) TokenLiteral() string { return ie.Token.Literal }
+func (ie *IfExpression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("if")
+	out.WriteString(ie.Condition.String())
+	out.WriteString(" ")
+	out.WriteString(ie.Then.String())
+
+	if ie.Else != nil {
+		out.WriteString("else ")
+		out.WriteString(ie.Else.String())
+	}
+
+	return out.String()
+}
+
+type BlockStatement struct {
+	Token      token.Token // The { token
+	Statements []Statement // Nested statements
+}
+
+func (bs *BlockStatement) statementNode()       {}
+func (bs *BlockStatement) TokenLiteral() string { return bs.Token.Literal }
+func (bs *BlockStatement) String() string {
+	var out bytes.Buffer
+
+	for _, stmt := range bs.Statements {
+		out.WriteString(stmt.String())
+	}
+
+	return out.String()
+}
+
+type FunctionLiteral struct {
+	Token      token.Token     // fn token
+	Parameters []*Identifier   // Parameters passed it
+	Body       *BlockStatement // Statements to execute
+}
+
+func (fl *FunctionLiteral) expressionNode()      {}
+func (fl *FunctionLiteral) TokenLiteral() string { return fl.Token.Literal }
+func (fl *FunctionLiteral) String() string {
+	var out bytes.Buffer
+
+	var params []string
+
+	for _, p := range fl.Parameters {
+		params = append(params, p.String())
+	}
+
+	out.WriteString(fl.TokenLiteral())
+	out.WriteString("(")
+	out.WriteString(strings.Join(params, ", "))
+	out.WriteString(") ")
+	out.WriteString(fl.Body.String())
+
+	return out.String()
+}
