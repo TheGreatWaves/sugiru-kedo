@@ -105,13 +105,14 @@ func (rs *ReturnStatement) TokenLiteral() string {
 func (rs *ReturnStatement) String() string {
 	var out bytes.Buffer
 
-	out.WriteString(rs.TokenLiteral() + " ")
-
+	out.WriteString(rs.TokenLiteral())
+	out.WriteString(" ")
 	if rs.ReturnValue != nil {
 		out.WriteString(rs.ReturnValue.String())
 	}
+	out.WriteString(";")
+	return out.String()
 
-	return ""
 }
 
 // ExpressionStatement is a statement in the form: "<EXPRESSION>"
@@ -260,8 +261,35 @@ func (fl *FunctionLiteral) String() string {
 	out.WriteString(fl.TokenLiteral())
 	out.WriteString("(")
 	out.WriteString(strings.Join(params, ", "))
-	out.WriteString(") ")
+	out.WriteString(") {\n")
 	out.WriteString(fl.Body.String())
+	out.WriteString("\n}")
+
+	return out.String()
+}
+
+// CallExpression fn(){}`(...)`
+type CallExpression struct {
+	Token     token.Token // The '(' token
+	Function  Expression  // The identifier or function literal
+	Arguments []Expression
+}
+
+func (ce *CallExpression) expressionNode()      {}
+func (ce *CallExpression) TokenLiteral() string { return ce.Token.Literal }
+func (ce *CallExpression) String() string {
+	var out bytes.Buffer
+
+	var args []string
+
+	for _, a := range ce.Arguments {
+		args = append(args, a.String())
+	}
+
+	out.WriteString(ce.Function.String())
+	out.WriteString("(")
+	out.WriteString(strings.Join(args, ", "))
+	out.WriteString(")")
 
 	return out.String()
 }
