@@ -35,9 +35,57 @@ func Eval(node ast.Node) object.Object {
 	case *ast.PrefixExpression:
 		right := Eval(node.Right)
 		return evalPrefixExpression(node.Operator, right)
+
+	case *ast.InfixExpression:
+		left := Eval(node.Left)
+		right := Eval(node.Right)
+		return evalInfixExpression(node.Operator, left, right)
 	}
 
 	return nil
+}
+
+func evalInfixExpression(
+	operator string,
+	left object.Object,
+	right object.Object) object.Object {
+	switch {
+	case left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ:
+		return evalIntegerInfixExpression(operator, left, right)
+	default:
+		return NULL
+	}
+}
+
+// evalIntegerInfixExpression takes an operator string and two objects of type Integer
+// and performs an arithmetic operation on the values of the object, depending on the
+// operator.
+//
+// Parameters:
+// - operator: A string representing the arithmetic operator to apply to the input integers.
+// - left: An object of type Integer, representing the left-hand operand.
+// - right: An object of type Integer, representing the right-hand operand.
+//
+// Returns:
+// - An object of type Integer, representing the result of the arithmetic operation.
+// - A NULL object, if the input objects are not of type Integer or if the operator is
+// not one of the supported arithmetic operators ('+', '-', '*', '/').
+func evalIntegerInfixExpression(operator string, left object.Object, right object.Object) object.Object {
+	leftVal := left.(*object.Integer).Value
+	rightVal := right.(*object.Integer).Value
+
+	switch operator {
+	case "+":
+		return &object.Integer{Value: leftVal + rightVal}
+	case "-":
+		return &object.Integer{Value: leftVal - rightVal}
+	case "/":
+		return &object.Integer{Value: leftVal / rightVal}
+	case "*":
+		return &object.Integer{Value: leftVal * rightVal}
+	default:
+		return NULL
+	}
 }
 
 func evalPrefixExpression(operator string, right object.Object) object.Object {
